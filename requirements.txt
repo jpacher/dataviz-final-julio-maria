@@ -2,3 +2,6 @@ streamlit
 pandas
 numpy
 geopandas
+matplotlib
+altair
+pydeck
