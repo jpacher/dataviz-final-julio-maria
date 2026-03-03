@@ -69,30 +69,28 @@ Source: U.S. Census Bureau
 
 ## Repository Structure
 
+```text
 streamlit-dashboard/
 ├── .streamlit/
-│ └── config.toml # Streamlit configuration
-│
+│   └── config.toml                 # Streamlit configuration
 ├── code/
-│ ├── app.py # Main Streamlit dashboard
-│ ├── preprocessing.py # Data cleaning and aggregation
-│ └── plots_static.py # Static plots (heatmap, boxplot)
-│
+│   ├── app.py                      # Main Streamlit dashboard
+│   ├── preprocessing.py            # Data cleaning and aggregation
+│   └── plots_static.py             # Static plots (heatmap, boxplot)
 ├── data/
-│ ├── raw-data/
-│ │ └── community_areas.csv # Community area metadata
-│ │
-│ └── derived-data/
-│ ├── acs_filtered.csv
-│ ├── df_311_ca.csv
-│ ├── df_311_type.csv
-│ ├── Boundaries_-_Community_Areas_20260301.geojson
-│ └── plots/
-│ ├── box_requests_income.png
-│ ├── heatmap_income_services.png
-│ ├── box_requests_income.html
-│ └── heatmap_income_services.html
-│
+│   ├── raw-data/
+│   │   └── community_areas.csv      # Community area metadata
+│   └── derived-data/
+│       ├── acs_filtered.csv
+│       ├── df_311_ca.csv
+│       ├── df_311_type.csv
+│       ├── Boundaries_-_Community_Areas_20260301.geojson
+│       └── plots/
+│           ├── box_requests_income.png
+│           ├── heatmap_income_services.png
+│           ├── box_requests_income.html
+│           └── heatmap_income_services.html
 ├── README.md
 └── requirements.txt
+```
 
