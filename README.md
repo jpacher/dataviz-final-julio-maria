@@ -44,6 +44,22 @@ The filtered 311 service request dataset downloaded from the Chicago Data Portal
 
 The dataset is publicly available at: https://data.cityofchicago.org/Service-Requests/311-Service-Requests/v6vf-nfxy/about_data
 
+### Large-file Reproducibility Note
+
+- `data/raw-data/311_request.csv` is intentionally not tracked in GitHub due to file size limits.
+- `df_311_type.csv` can also be sourced from Google Drive when absent locally.
+- The code supports Drive-based loading with either:
+  - `DF311_TYPE_DRIVE_URL`
+  - `DF311_TYPE_DRIVE_FILE_ID`
+
+Example:
+
+```bash
+export DF311_TYPE_DRIVE_FILE_ID=1rYJpNKT4kix_NAPhL--LJIDq9Ctp1vhs
+python code/plots_static.py
+streamlit run code/app.py
+```
+
 ### 2. American Community Survey (ACS) 5-Year Estimates (2019–2023)
 Source: U.S. Census Bureau  
 
@@ -97,4 +113,3 @@ streamlit-dashboard/
 ├── README.md
 └── requirements.txt
 ```
-
