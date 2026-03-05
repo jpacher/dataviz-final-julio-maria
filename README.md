@@ -40,6 +40,10 @@ Source: City of Chicago Data Portal
   - Service demand (requests per 1,000 residents)
   - Service efficiency (response time in days)
 
+The filtered 311 service request dataset downloaded from the Chicago Data Portal exceeds GitHub’s 100MB file limit, so it is stored externally in Google Drive and can be accessed here: https://drive.google.com/file/d/1rYJpNKT4kix_NAPhL--LJIDq9Ctp1vhs/view
+
+The dataset is publicly available at: https://data.cityofchicago.org/Service-Requests/311-Service-Requests/v6vf-nfxy/about_data
+
 ### 2. American Community Survey (ACS) 5-Year Estimates (2019–2023)
 Source: U.S. Census Bureau  
 
