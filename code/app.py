@@ -1,6 +1,8 @@
 from pathlib import Path
+import os
 
 import altair as alt
+import gdown
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
@@ -13,6 +15,8 @@ import streamlit as st
 SCRIPT_DIR = Path(__file__).parent
 TYPE_DATA_PATH = SCRIPT_DIR / "../data/derived-data/df_311_type.csv"
 GEO_PATH = SCRIPT_DIR / "../data/derived-data/Boundaries_-_Community_Areas_20260301.geojson"
+DF311_TYPE_DRIVE_URL = os.getenv("DF311_TYPE_DRIVE_URL", "").strip()
+DF311_TYPE_DRIVE_FILE_ID = os.getenv("DF311_TYPE_DRIVE_FILE_ID", "").strip()
 MIN_MEDIAN_DAYS = 0.25
 
 
@@ -29,6 +33,17 @@ def fit_slope(group: pd.DataFrame) -> float:
 
 @st.cache_data
 def load_data() -> pd.DataFrame:
+    if not TYPE_DATA_PATH.exists():
+        TYPE_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+        if DF311_TYPE_DRIVE_URL:
+            gdown.download(DF311_TYPE_DRIVE_URL, str(TYPE_DATA_PATH), quiet=False)
+        elif DF311_TYPE_DRIVE_FILE_ID:
+            gdown.download(
+                f"https://drive.google.com/uc?id={DF311_TYPE_DRIVE_FILE_ID}",
+                str(TYPE_DATA_PATH),
+                quiet=False,
+            )
+
     if not TYPE_DATA_PATH.exists():
         raise FileNotFoundError(f"Missing data file: {TYPE_DATA_PATH}")
 

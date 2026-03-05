@@ -1,6 +1,8 @@
 from pathlib import Path
+import os
 
 import altair as alt
+import gdown
 import pandas as pd
 
 
@@ -9,6 +11,8 @@ DERIVED_DIR = SCRIPT_DIR / "../data/derived-data"
 PLOTS_DIR = DERIVED_DIR / "plots"
 TYPE_PATH = DERIVED_DIR / "df_311_type.csv"
 AREA_PATH = DERIVED_DIR / "df_311_ca.csv"
+DF311_TYPE_DRIVE_URL = os.getenv("DF311_TYPE_DRIVE_URL", "").strip()
+DF311_TYPE_DRIVE_FILE_ID = os.getenv("DF311_TYPE_DRIVE_FILE_ID", "").strip()
 
 EXCLUDED_AREAS = {"OHARE"}
 EXCLUDED_SERVICE_TYPES = {
@@ -43,6 +47,25 @@ def ensure_input(path: Path) -> None:
         raise FileNotFoundError(f"Missing required file: {path}")
 
 
+def ensure_type_data() -> None:
+    if TYPE_PATH.exists():
+        return
+
+    TYPE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if DF311_TYPE_DRIVE_URL:
+        gdown.download(DF311_TYPE_DRIVE_URL, str(TYPE_PATH), quiet=False)
+    elif DF311_TYPE_DRIVE_FILE_ID:
+        gdown.download(f"https://drive.google.com/uc?id={DF311_TYPE_DRIVE_FILE_ID}", str(TYPE_PATH), quiet=False)
+    else:
+        raise FileNotFoundError(
+            "Missing df_311_type.csv. Set DF311_TYPE_DRIVE_URL or DF311_TYPE_DRIVE_FILE_ID "
+            "to download it from Google Drive."
+        )
+
+    if not TYPE_PATH.exists():
+        raise FileNotFoundError(f"Could not download required file: {TYPE_PATH}")
+
+
 
 def add_income_groups(df: pd.DataFrame) -> pd.DataFrame:
     quartile_source = (
@@ -65,7 +88,7 @@ def add_income_groups(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_type_data() -> pd.DataFrame:
-    ensure_input(TYPE_PATH)
+    ensure_type_data()
     df = pd.read_csv(TYPE_PATH)
 
     for col in ["community_area", "total_requests", "income_estimate", "total_population"]:
@@ -90,7 +113,7 @@ def load_type_data() -> pd.DataFrame:
 
 
 def load_area_data() -> pd.DataFrame:
-    ensure_input(TYPE_PATH)
+    ensure_type_data()
     df = pd.read_csv(TYPE_PATH)
 
     for col in ["community_area", "income_estimate", "total_population", "total_requests"]:
@@ -201,19 +224,10 @@ def build_boxplot(area_df: pd.DataFrame) -> alt.Chart:
 
     return (
         alt.Chart(plot_df)
-        .mark_boxplot(extent=1.5, size=36)
+        .mark_boxplot(extent=1.5, size=36, color="#1f77b4")
         .encode(
             x=alt.X("income_group:N", sort=QUARTILE_LABELS, title="Income Group"),
             y=alt.Y("requests_per_1000:Q", title="Requests per 1,000 residents"),
-            color=alt.Color(
-                "income_group:N",
-                sort=QUARTILE_LABELS,
-                scale=alt.Scale(
-                    domain=QUARTILE_LABELS,
-                    range=["#9BD3F5", "#41B6E6", "#C8102E", "#0B1F41"],
-                ),
-                legend=None,
-            ),
             tooltip=[
                 alt.Tooltip("community_area_name:N", title="Community Area"),
                 alt.Tooltip("income_group:N", title="Income Group"),

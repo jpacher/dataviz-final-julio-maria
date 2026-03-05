@@ -1,0 +1,1068 @@
+---
+title: "SERVICE REQUEST AND DELIVERY: EVIDENCE FROM 311 SYSTEM IN CHICAGO"
+subtitle: "PPHA 30538 Data Analytics and Visualization for Public Policy Final Project"
+author:
+  - "María Manjarrez - GitHub username: Marite21 - Section 1 Professor Shi (M/W 9:00-10:20 AM)"
+  - "Julio Pacher - GitHub username: jpacher - Section 2 Professor Shi (M/W 10:30-11:50 AM)"
+format:
+  pdf:
+    toc: false
+    number-sections: false
+    geometry: margin=0.9in
+    documentclass: article
+    classoption: 10pt
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+## Research Question
+
+Chicago exhibits substantial variation in median household income across neighborhoods. Public service delivery, such as street maintenance and pothole repairs, may also vary across space, raising concerns about whether municipal services are distributed equitably. The City of Chicago's 311 system provides a centralized platform through which residents submit service requests. These data offer a unique opportunity to evaluate how the city responds to neighborhood needs.
+
+Our principal research question is:
+
+Are neighborhood income differences in Chicago associated with disparities in 311 service demand and response times across Community Areas?
+
+Secondary research questions:
+
+1. Do service demand levels differ systematically across neighborhood income groups?
+2. Do the types of 311 requests vary by neighborhood income level?
+3. Is service response time associated with neighborhood income?
+
+## Approach
+
+### Data Sources
+
+We utilized datasets from the Chicago Data Portal, including:
+
+1. **311 Service Requests**: This dataset includes service requests created after the launch of the new 311 system on 12/18/2018 and some records from the previous system. Source: City of Chicago Data Portal (CHI311).
+2. **American Community Survey (ACS) 5-Year Data by Community Area**: This dataset provides neighborhood-level socioeconomic indicators from the 2019-2023 ACS 5-Year Estimates. Source: U.S. Census Bureau – ACS 5-Year Data (Community Area level).
+3. **Community Area Geoboundaries**: Chicago Community Area boundaries from the Chicago Data Portal, used for map-based analysis and dashboard geography.
+
+**Data Retrieval:** Saturday, February 14, 4:17 PM.
+
+### Data Preparation
+
+The raw 311 dataset includes records submitted between January 1, 2023 and December 31, 2024. We filtered observations to keep valid Community Area identifiers and relevant fields (creation date, completion date, request type, service status, and geography).
+
+To measure service efficiency, we constructed response time as completion date minus creation date. Observations with missing completion dates were excluded from response-time calculations.
+
+The 311 data were aggregated at the Community Area level to produce:
+
+- Total service requests
+- Average response time
+
+We normalized demand by neighborhood population using ACS, calculating requests per 1,000 residents, and merged the 311 aggregates with ACS socioeconomic indicators.
+
+Exclusions and reasons in analysis/dashboard:
+
+- **OHARE**: excluded because it is not directly comparable to residential community areas.
+- **311 INFORMATION ONLY CALL**: excluded because it is not an actionable service-delivery category.
+- **FOREST GLEN**: excluded from response-time mapping because it behaves as an outlier that compresses map variation for other areas.
+
+```{python}
+#| include: false
+from pathlib import Path
+import importlib.util
+import subprocess
+import sys
+
+project_root = Path(".").resolve()
+code_dir = project_root / "code"
+derived_dir = project_root / "data" / "derived-data"
+plots_dir = derived_dir / "plots"
+geo_path = derived_dir / "Boundaries_-_Community_Areas_20260301.geojson"
+
+if not (code_dir / "preprocessing.py").exists():
+    raise FileNotFoundError("Missing code/preprocessing.py")
+if not (code_dir / "plots_static.py").exists():
+    raise FileNotFoundError("Missing code/plots_static.py")
+if not (code_dir / "app.py").exists():
+    raise FileNotFoundError("Missing code/app.py")
+if not geo_path.exists():
+    raise FileNotFoundError("Missing geoboundaries GeoJSON file")
+
+# Use existing derived outputs for render reproducibility without redownloading raw data.
+if not (derived_dir / "df_311_type.csv").exists():
+    raise FileNotFoundError("Missing data/derived-data/df_311_type.csv")
+if not (derived_dir / "df_311_ca.csv").exists():
+    raise FileNotFoundError("Missing data/derived-data/df_311_ca.csv")
+
+# Rebuild static plots quietly from the project script.
+subprocess.run(
+    [sys.executable, str(code_dir / "plots_static.py")],
+    check=True,
+    cwd=project_root,
+    capture_output=True,
+    text=True,
+)
+
+# Load plotting functions directly from plots_static.py
+spec = importlib.util.spec_from_file_location("plots_static_module", code_dir / "plots_static.py")
+plots_static_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(plots_static_module)
+
+type_df = plots_static_module.load_type_data()
+area_df = plots_static_module.load_area_data()
+summary = plots_static_module.summarize_service_by_quartile(type_df)
+
+box_chart = plots_static_module.build_boxplot(area_df).properties(width=360, height=280)
+heatmap_chart = plots_static_module.build_heatmap(summary).properties(width=360, height=230)
+
+boxplot_png = plots_dir / "box_requests_income.png"
+heatmap_png = plots_dir / "heatmap_income_services.png"
+if not boxplot_png.exists() or not heatmap_png.exists():
+    raise FileNotFoundError("Missing generated static plot PNG files in data/derived-data/plots")
+
+# Keep the three project scripts embedded in the QMD execution context.
+preprocessing_py = (code_dir / "preprocessing.py").read_text(encoding="utf-8")
+plots_static_py = (code_dir / "plots_static.py").read_text(encoding="utf-8")
+app_py = (code_dir / "app.py").read_text(encoding="utf-8")
+```
+
+## Key Findings
+
+### Finding 1: Service Demand by Income Group (Boxplot)
+
+```{python}
+from IPython.display import Image, display
+display(Image(filename=str(boxplot_png)))
+```
+
+This first finding responds to Research Question 1. The boxplot indicates that request intensity is not evenly distributed across income groups, with visible differences in medians and dispersion. The distributional spread also suggests that even within the same income group, neighborhoods can experience very different levels of service demand pressure.
+
+### Finding 2: Service-Type Composition by Income Group (Heatmap)
+
+```{python}
+from IPython.display import Image, display
+display(Image(filename=str(heatmap_png)))
+```
+
+This second finding responds to Research Questions 2 and 3. The heatmap shows that demand patterns vary by service category and are not uniform across income groups. Different concentration patterns across cells support the interpretation that neighborhood context matters for both what residents request and how service outcomes differ across issue types.
+
+## Streamlit Dashboard (Brief Explanation)
+
+Interactive app: [https://app-dashboard-qmg6hcjcl7n7vv6yqnpsag.streamlit.app/](https://app-dashboard-qmg6hcjcl7n7vv6yqnpsag.streamlit.app/)
+
+This first graphic shows the relationship between neighborhood income and 311 service outcomes across Community Areas.
+
+We observe both positive and negative trends depending on the service type selected, suggesting that disparities are not uniform across categories.
+
+For some service types, higher-income areas show shorter response times, indicating a potential efficiency advantage. In other cases, the contrary occurs.
+
+The interactive feature allows users to select specific service types, enabling direct comparison across Community Areas and revealing how patterns shift depending on the issue analyzed.
+
+The dashboard also includes two maps:
+
+1. Requests - volume.
+2. Service time - average (different from the graphic because here it is an average of all service types).
+
+We used Chicago boundaries from Chicago Data Portal.
+
+## Policy Implications
+
+Chicago should monitor requests per 1,000 residents and average response times by Community Area and income group, rather than relying only on citywide averages. Prioritizing resources where high demand and slower service overlap can improve equity in service delivery.
+
+
+
+
+<!-- HIDDEN_SCRIPT_MIRROR_START -->
+
+```{python}
+#| include: false
+#| eval: false
+import re
+from pathlib import Path
+
+import gdown
+import pandas as pd
+
+script_dir = Path(__file__).parent
+
+
+def normalize_name(value: str) -> str:
+    text = str(value).strip().upper()
+    text = re.sub(r"[^A-Z0-9 ]", "", text)
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def normalize_col(name: str) -> str:
+    value = name.strip().lower()
+    value = value.replace("$", "")
+    value = value.replace("+", "plus")
+    value = value.replace(" to ", "_")
+    value = value.replace(",", "")
+    value = value.replace(" ", "_")
+    value = value.replace("-", "_")
+    value = re.sub(r"[^a-z0-9_]", "", value)
+    value = re.sub(r"_+", "_", value).strip("_")
+    return value
+
+
+def to_numeric(series: pd.Series) -> pd.Series:
+    return pd.to_numeric(series.astype(str).str.replace(",", "", regex=False), errors="coerce")
+
+
+community_area_lookup = {
+    1: "ROGERS PARK", 2: "WEST RIDGE", 3: "UPTOWN", 4: "LINCOLN SQUARE", 5: "NORTH CENTER",
+    6: "LAKE VIEW", 7: "LINCOLN PARK", 8: "NEAR NORTH SIDE", 9: "EDISON PARK", 10: "NORWOOD PARK",
+    11: "JEFFERSON PARK", 12: "FOREST GLEN", 13: "NORTH PARK", 14: "ALBANY PARK", 15: "PORTAGE PARK",
+    16: "IRVING PARK", 17: "DUNNING", 18: "MONTCLARE", 19: "BELMONT CRAGIN", 20: "HERMOSA",
+    21: "AVONDALE", 22: "LOGAN SQUARE", 23: "HUMBOLDT PARK", 24: "WEST TOWN", 25: "AUSTIN",
+    26: "WEST GARFIELD PARK", 27: "EAST GARFIELD PARK", 28: "NEAR WEST SIDE", 29: "NORTH LAWNDALE", 30: "SOUTH LAWNDALE",
+    31: "LOWER WEST SIDE", 32: "LOOP", 33: "NEAR SOUTH SIDE", 34: "ARMOUR SQUARE", 35: "DOUGLAS",
+    36: "OAKLAND", 37: "FULLER PARK", 38: "GRAND BOULEVARD", 39: "KENWOOD", 40: "WASHINGTON PARK",
+    41: "HYDE PARK", 42: "WOODLAWN", 43: "SOUTH SHORE", 44: "CHATHAM", 45: "AVALON PARK",
+    46: "SOUTH CHICAGO", 47: "BURNSIDE", 48: "CALUMET HEIGHTS", 49: "ROSELAND", 50: "PULLMAN",
+    51: "SOUTH DEERING", 52: "EAST SIDE", 53: "WEST PULLMAN", 54: "RIVERDALE", 55: "HEGEWISCH",
+    56: "GARFIELD RIDGE", 57: "ARCHER HEIGHTS", 58: "BRIGHTON PARK", 59: "MCKINLEY PARK", 60: "BRIDGEPORT",
+    61: "NEW CITY", 62: "WEST ELSDON", 63: "GAGE PARK", 64: "CLEARING", 65: "WEST LAWN",
+    66: "CHICAGO LAWN", 67: "WEST ENGLEWOOD", 68: "ENGLEWOOD", 69: "GREATER GRAND CROSSING", 70: "ASHBURN",
+    71: "AUBURN GRESHAM", 72: "BEVERLY", 73: "WASHINGTON HEIGHTS", 74: "MOUNT GREENWOOD", 75: "MORGAN PARK",
+    76: "OHARE", 77: "EDGEWATER",
+}
+name_to_id = {name: area_id for area_id, name in community_area_lookup.items()}
+
+
+# Community area dataset
+community_area_path = script_dir / "../data/raw-data/community_areas.csv"
+if not community_area_path.exists():
+    raise FileNotFoundError(f"Missing input file: {community_area_path}")
+
+raw_ca = pd.read_csv(community_area_path)
+print(f"Community source: {community_area_path}")
+
+# 311 dataset
+requests_path = script_dir / "../data/raw-data/311_request.csv"
+if not requests_path.exists():
+    file_id = "1rYJpNKT4kix_NAPhL--LJIDq9Ctp1vhs"
+    url = f"https://drive.google.com/uc?id={file_id}"
+    requests_path.parent.mkdir(parents=True, exist_ok=True)
+    gdown.download(url, str(requests_path), quiet=False)
+
+raw_311 = pd.read_csv(requests_path)
+print(f"311 source: {requests_path}")
+
+# Clean ACS/community area data
+acs = raw_ca.copy()
+acs.columns = [normalize_col(c) for c in acs.columns]
+
+if "acs_year" in acs.columns:
+    acs["acs_year"] = to_numeric(acs["acs_year"])
+    latest_year = acs["acs_year"].max()
+    if pd.notna(latest_year):
+        acs = acs[acs["acs_year"] == latest_year].copy()
+
+numeric_cols = [
+    "under_25000",
+    "25000_49999",
+    "50000_74999",
+    "75000_125000",
+    "125000_plus",
+    "male_0_to_17",
+    "male_18_to_24",
+    "male_25_to_34",
+    "male_35_to_49",
+    "male_50_to_64",
+    "male_65",
+    "female_0_to_17",
+    "female_18_to_24",
+    "female_25_to_34",
+    "female_35_to_49",
+    "female_50_to_64",
+    "female_65_plus",
+    "total_population",
+    "white",
+    "black_or_african_american",
+    "american_indian_or_alaska_native",
+    "asian",
+    "native_hawaiian_or_pacific_islander",
+    "other_race",
+    "multiracial",
+    "white_not_hispanic_or_latino",
+    "hispanic_or_latino",
+]
+for col in numeric_cols:
+    if col in acs.columns:
+        acs[col] = to_numeric(acs[col])
+
+if "community_area" not in acs.columns:
+    raise ValueError("Expected column 'community_area' not found after normalization")
+
+income_cols = ["under_25000", "25000_49999", "50000_74999", "75000_125000", "125000_plus"]
+if all(c in acs.columns for c in income_cols):
+    acs["total_households_est"] = acs[income_cols].sum(axis=1)
+    midpoints = [12500, 37500, 62500, 100000, 150000]
+    weighted_income = acs[income_cols].fillna(0).mul(midpoints, axis=1).sum(axis=1)
+    acs["income_estimate"] = weighted_income / acs["total_households_est"].where(acs["total_households_est"] > 0)
+else:
+    acs["income_estimate"] = pd.NA
+
+if "total_population" in acs.columns:
+    for src, dst in [
+        ("black_or_african_american", "pct_black"),
+        ("hispanic_or_latino", "pct_hispanic"),
+        ("white", "pct_white"),
+        ("asian", "pct_asian"),
+    ]:
+        if src in acs.columns:
+            acs[dst] = (acs[src] / acs["total_population"].where(acs["total_population"] > 0)) * 100
+
+acs["community_area_name"] = acs["community_area"].map(normalize_name)
+acs["community_area_number"] = acs["community_area_name"].map(name_to_id)
+
+acs_keep_cols = [
+    "acs_year",
+    "community_area",
+    "community_area_name",
+    "community_area_number",
+    "total_population",
+    "total_households_est",
+    "income_estimate",
+    "pct_black",
+    "pct_hispanic",
+    "pct_white",
+    "pct_asian",
+]
+acs_available_cols = [c for c in acs_keep_cols if c in acs.columns]
+acs_filtered = acs[acs_available_cols].drop_duplicates(subset=["community_area_name"]).copy()
+acs_filtered = acs_filtered.sort_values(
+    by=[c for c in ["community_area_number", "community_area_name"] if c in acs_filtered.columns]
+)
+
+# Clean 311 data
+raw_311.columns = raw_311.columns.str.strip().str.lower().str.replace(" ", "_", regex=False)
+
+if "status" in raw_311.columns:
+    raw_311 = raw_311[raw_311["status"].astype(str).str.lower().isin(["completed", "closed"])].copy()
+
+if "created_date" in raw_311.columns:
+    created_col = "created_date"
+elif "creation_date" in raw_311.columns:
+    created_col = "creation_date"
+else:
+    raise ValueError("No encontré columna de fecha de creación en 311")
+
+if "completion_date" in raw_311.columns:
+    done_col = "completion_date"
+elif "closed_date" in raw_311.columns:
+    done_col = "closed_date"
+else:
+    raise ValueError("No encontré columna de fecha de cierre/completion en 311")
+
+if "community_area" not in raw_311.columns:
+    raise ValueError("No encontré columna 'community_area' en 311")
+
+if "sr_type" in raw_311.columns:
+    service_col = "sr_type"
+elif "service_request_type" in raw_311.columns:
+    service_col = "service_request_type"
+else:
+    raise ValueError("No encontré columna de tipo de servicio en 311")
+
+fmt = "%m/%d/%Y %I:%M:%S %p"
+raw_311["created_at"] = pd.to_datetime(raw_311[created_col], format=fmt, errors="coerce")
+raw_311["done_at"] = pd.to_datetime(raw_311[done_col], format=fmt, errors="coerce")
+
+mask_created = raw_311["created_at"].isna() & raw_311[created_col].notna()
+if mask_created.any():
+    raw_311.loc[mask_created, "created_at"] = pd.to_datetime(
+        raw_311.loc[mask_created, created_col], errors="coerce"
+    )
+
+mask_done = raw_311["done_at"].isna() & raw_311[done_col].notna()
+if mask_done.any():
+    raw_311.loc[mask_done, "done_at"] = pd.to_datetime(
+        raw_311.loc[mask_done, done_col], errors="coerce"
+    )
+
+raw_311["response_time_hours"] = (raw_311["done_at"] - raw_311["created_at"]).dt.total_seconds() / 3600
+raw_311["community_area"] = pd.to_numeric(raw_311["community_area"], errors="coerce")
+raw_311["service_request_type"] = raw_311[service_col].astype(str).str.strip()
+
+raw_311 = raw_311.dropna(
+    subset=["community_area", "created_at", "done_at", "response_time_hours", "service_request_type"]
+)
+raw_311 = raw_311[raw_311["response_time_hours"] >= 0]
+raw_311 = raw_311[raw_311["service_request_type"] != ""]
+
+agg_311 = (
+    raw_311.groupby("community_area", as_index=False)
+    .agg(
+        total_requests=("response_time_hours", "size"),
+        avg_response_time=("response_time_hours", "mean"),
+    )
+)
+agg_311["community_area"] = agg_311["community_area"].astype("Int64")
+agg_311["community_area_name"] = agg_311["community_area"].map(community_area_lookup)
+
+agg_311_type = (
+    raw_311.groupby(["community_area", "service_request_type"], as_index=False)
+    .agg(
+        total_requests=("response_time_hours", "size"),
+        avg_response_time=("response_time_hours", "mean"),
+    )
+)
+agg_311_type["community_area"] = agg_311_type["community_area"].astype("Int64")
+agg_311_type["community_area_name"] = agg_311_type["community_area"].map(community_area_lookup)
+
+# Merge 311 with ACS summary
+acs_merge = acs_filtered[[c for c in [
+    "community_area_name",
+    "community_area_number",
+    "total_population",
+    "income_estimate",
+    "pct_black",
+    "pct_hispanic",
+    "pct_white",
+    "pct_asian",
+] if c in acs_filtered.columns]].copy()
+acs_merge = acs_merge.rename(columns={"community_area_number": "community_area"})
+
+merged = agg_311.merge(acs_merge, on=["community_area", "community_area_name"], how="left")
+merged_type = agg_311_type.merge(acs_merge, on=["community_area", "community_area_name"], how="left")
+
+if "total_population" in merged.columns:
+    merged["requests_per_1000"] = (merged["total_requests"] / merged["total_population"]) * 1000
+    merged.loc[
+        merged["total_population"].isna() | (merged["total_population"] <= 0),
+        "requests_per_1000",
+    ] = pd.NA
+
+if "total_population" in merged_type.columns:
+    merged_type["requests_per_1000_by_type"] = (
+        merged_type["total_requests"] / merged_type["total_population"]
+    ) * 1000
+    merged_type.loc[
+        merged_type["total_population"].isna() | (merged_type["total_population"] <= 0),
+        "requests_per_1000_by_type",
+    ] = pd.NA
+
+# Output
+derived_dir = script_dir / "../data/derived-data"
+derived_dir.mkdir(parents=True, exist_ok=True)
+
+acs_output_path = derived_dir / "acs_filtered.csv"
+df311_output_path = derived_dir / "df_311_ca.csv"
+df311_type_output_path = derived_dir / "df_311_type.csv"
+
+acs_filtered.to_csv(acs_output_path, index=False)
+merged.to_csv(df311_output_path, index=False)
+merged_type.to_csv(df311_type_output_path, index=False)
+
+print(f"Saved: {acs_output_path}")
+print(f"ACS rows: {len(acs_filtered)}")
+print(f"Saved: {df311_output_path}")
+print(f"311 rows: {len(merged)}")
+print(f"Saved: {df311_type_output_path}")
+print(f"311 type rows: {len(merged_type)}")
+print(merged.head())
+```
+
+```{python}
+#| include: false
+#| eval: false
+from pathlib import Path
+import os
+
+import altair as alt
+import gdown
+import pandas as pd
+
+
+SCRIPT_DIR = Path(__file__).parent
+DERIVED_DIR = SCRIPT_DIR / "../data/derived-data"
+PLOTS_DIR = DERIVED_DIR / "plots"
+TYPE_PATH = DERIVED_DIR / "df_311_type.csv"
+AREA_PATH = DERIVED_DIR / "df_311_ca.csv"
+DF311_TYPE_DRIVE_URL = os.getenv("DF311_TYPE_DRIVE_URL", "").strip()
+DF311_TYPE_DRIVE_FILE_ID = os.getenv("DF311_TYPE_DRIVE_FILE_ID", "").strip()
+
+EXCLUDED_AREAS = {"OHARE"}
+EXCLUDED_SERVICE_TYPES = {
+    "311 INFORMATION ONLY CALL",
+    "Tree Trim Request (NO LONGER BEING ACCEPTED)",
+}
+QUARTILE_LABELS = [
+    "Low Income",
+    "Middle-Low Income",
+    "Middle-High Income",
+    "High Income",
+]
+CHICAGO_BAR_COLORS = [
+    "#41B6E6",
+    "#C8102E",
+    "#0B1F41",
+    "#9BD3F5",
+    "#7A0019",
+    "#6FA8DC",
+]
+CHICAGO_HEAT_COLORS = [
+    "#F7FBFF",
+    "#D6EAF8",
+    "#9ECAE1",
+    "#4A90C2",
+    "#0B3C6D",
+]
+
+
+def ensure_input(path: Path) -> None:
+    if not path.exists():
+        raise FileNotFoundError(f"Missing required file: {path}")
+
+
+def ensure_type_data() -> None:
+    if TYPE_PATH.exists():
+        return
+
+    TYPE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if DF311_TYPE_DRIVE_URL:
+        gdown.download(DF311_TYPE_DRIVE_URL, str(TYPE_PATH), quiet=False)
+    elif DF311_TYPE_DRIVE_FILE_ID:
+        gdown.download(f"https://drive.google.com/uc?id={DF311_TYPE_DRIVE_FILE_ID}", str(TYPE_PATH), quiet=False)
+    else:
+        raise FileNotFoundError(
+            "Missing df_311_type.csv. Set DF311_TYPE_DRIVE_URL or DF311_TYPE_DRIVE_FILE_ID "
+            "to download it from Google Drive."
+        )
+
+    if not TYPE_PATH.exists():
+        raise FileNotFoundError(f"Could not download required file: {TYPE_PATH}")
+
+
+
+def add_income_groups(df: pd.DataFrame) -> pd.DataFrame:
+    quartile_source = (
+        df[["community_area", "income_estimate"]]
+        .drop_duplicates(subset=["community_area"])
+        .copy()
+    )
+    quartile_source["income_group"] = pd.qcut(
+        quartile_source["income_estimate"],
+        4,
+        labels=QUARTILE_LABELS,
+    )
+
+    return df.merge(
+        quartile_source[["community_area", "income_group"]],
+        on="community_area",
+        how="left",
+    )
+
+
+
+def load_type_data() -> pd.DataFrame:
+    ensure_type_data()
+    df = pd.read_csv(TYPE_PATH)
+
+    for col in ["community_area", "total_requests", "income_estimate", "total_population"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = df.dropna(
+        subset=[
+            "community_area",
+            "community_area_name",
+            "service_request_type",
+            "income_estimate",
+            "total_population",
+            "total_requests",
+        ]
+    ).copy()
+    df = df[df["total_population"] > 0]
+    df = df[~df["community_area_name"].isin(EXCLUDED_AREAS)]
+    df = df[~df["service_request_type"].isin(EXCLUDED_SERVICE_TYPES)]
+    return add_income_groups(df)
+
+
+
+def load_area_data() -> pd.DataFrame:
+    ensure_type_data()
+    df = pd.read_csv(TYPE_PATH)
+
+    for col in ["community_area", "income_estimate", "total_population", "total_requests"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = df.dropna(
+        subset=[
+            "community_area",
+            "community_area_name",
+            "service_request_type",
+            "income_estimate",
+            "total_population",
+            "total_requests",
+        ]
+    ).copy()
+    df = df[df["total_population"] > 0]
+    df = df[~df["community_area_name"].isin(EXCLUDED_AREAS)]
+    df = df[~df["service_request_type"].isin(EXCLUDED_SERVICE_TYPES)]
+
+    area_df = (
+        df.groupby(
+            ["community_area", "community_area_name", "income_estimate", "total_population"],
+            as_index=False,
+        )
+        .agg(total_requests=("total_requests", "sum"))
+    )
+    area_df["requests_per_1000"] = (
+        area_df["total_requests"] / area_df["total_population"]
+    ) * 1000
+
+    area_df = add_income_groups(area_df)
+    area_df["income_group"] = pd.Categorical(
+        area_df["income_group"], categories=QUARTILE_LABELS, ordered=True
+    )
+    return area_df
+
+
+
+def summarize_service_by_quartile(df: pd.DataFrame, top_n: int = 6) -> pd.DataFrame:
+    top_services = (
+        df.groupby("service_request_type")["total_requests"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(top_n)
+        .index
+    )
+
+    summary = (
+        df[df["service_request_type"].isin(top_services)]
+        .groupby(["income_group", "service_request_type"], observed=False)
+        .agg(
+            total_requests=("total_requests", "sum"),
+            total_population=("total_population", "sum"),
+        )
+        .reset_index()
+    )
+    summary["requests_per_1000"] = (
+        summary["total_requests"] / summary["total_population"]
+    ) * 1000
+    summary["income_group"] = pd.Categorical(
+        summary["income_group"], categories=QUARTILE_LABELS, ordered=True
+    )
+    return summary.sort_values(["income_group", "requests_per_1000"], ascending=[True, False])
+
+
+
+def build_heatmap(summary: pd.DataFrame) -> alt.Chart:
+    service_order = (
+        summary.groupby("service_request_type")["requests_per_1000"]
+        .mean()
+        .sort_values(ascending=False)
+        .index
+        .tolist()
+    )
+
+    return (
+        alt.Chart(summary)
+        .mark_rect()
+        .encode(
+            x=alt.X("income_group:N", sort=QUARTILE_LABELS, title="Income Group"),
+            y=alt.Y("service_request_type:N", sort=service_order, title="Service Type"),
+            color=alt.Color(
+                "requests_per_1000:Q",
+                title="Requests per 1,000 residents",
+                scale=alt.Scale(range=CHICAGO_HEAT_COLORS),
+            ),
+            tooltip=[
+                alt.Tooltip("income_group:N", title="Income Group"),
+                alt.Tooltip("service_request_type:N", title="Service Type"),
+                alt.Tooltip("requests_per_1000:Q", title="Requests per 1,000", format=".2f"),
+                alt.Tooltip("total_requests:Q", title="Total Requests", format=","),
+            ],
+        )
+        .properties(
+            width=420,
+            height=260,
+            title="Heatmap of 311 Service Types by Income Group",
+        )
+        .configure_axis(labelFontSize=12, titleFontSize=14)
+        .configure_legend(titleFontSize=12, labelFontSize=11)
+        .configure_title(fontSize=16)
+    )
+
+
+def build_boxplot(area_df: pd.DataFrame) -> alt.Chart:
+    plot_df = area_df[area_df["community_area_name"] != "NEAR WEST SIDE"].copy()
+
+    return (
+        alt.Chart(plot_df)
+        .mark_boxplot(extent=1.5, size=36, color="#1f77b4")
+        .encode(
+            x=alt.X("income_group:N", sort=QUARTILE_LABELS, title="Income Group"),
+            y=alt.Y("requests_per_1000:Q", title="Requests per 1,000 residents"),
+            tooltip=[
+                alt.Tooltip("community_area_name:N", title="Community Area"),
+                alt.Tooltip("income_group:N", title="Income Group"),
+                alt.Tooltip("requests_per_1000:Q", title="Requests per 1,000", format=".2f"),
+            ],
+        )
+        .properties(
+            width=420,
+            height=360,
+            title="Distribution of 311 Request Rates by Income Group",
+        )
+        .configure_axis(labelFontSize=11, titleFontSize=14)
+        .configure_axisX(labelFontSize=9, labelAngle=0)
+        .configure_title(fontSize=16)
+    )
+
+
+
+def save_chart(chart: alt.Chart, stem: str) -> None:
+    html_path = PLOTS_DIR / f"{stem}.html"
+    png_path = PLOTS_DIR / f"{stem}.png"
+    chart.save(html_path)
+    chart.save(png_path, scale_factor=3)
+    print(f"Saved plot: {html_path}")
+    print(f"Saved plot: {png_path}")
+
+
+
+def main() -> None:
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+
+    type_df = load_type_data()
+    area_df = load_area_data()
+    summary = summarize_service_by_quartile(type_df)
+
+    save_chart(build_heatmap(summary), "heatmap_income_services")
+    save_chart(build_boxplot(area_df), "box_requests_income")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+```{python}
+#| include: false
+#| eval: false
+from pathlib import Path
+import os
+
+import altair as alt
+import gdown
+import geopandas as gpd
+import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import pydeck as pdk
+import numpy as np
+import pandas as pd
+import streamlit as st
+
+
+SCRIPT_DIR = Path(__file__).parent
+TYPE_DATA_PATH = SCRIPT_DIR / "../data/derived-data/df_311_type.csv"
+GEO_PATH = SCRIPT_DIR / "../data/derived-data/Boundaries_-_Community_Areas_20260301.geojson"
+DF311_TYPE_DRIVE_URL = os.getenv("DF311_TYPE_DRIVE_URL", "").strip()
+DF311_TYPE_DRIVE_FILE_ID = os.getenv("DF311_TYPE_DRIVE_FILE_ID", "").strip()
+MIN_MEDIAN_DAYS = 0.25
+
+
+def fit_slope(group: pd.DataFrame) -> float:
+    if len(group) < 3:
+        return float("nan")
+    x = group["income_estimate"].to_numpy()
+    y = group["avg_response_days"].to_numpy()
+    if np.std(x) == 0 or np.std(y) == 0:
+        return float("nan")
+    slope, _ = np.polyfit(x, y, 1)
+    return float(slope)
+
+
+@st.cache_data
+def load_data() -> pd.DataFrame:
+    if not TYPE_DATA_PATH.exists():
+        TYPE_DATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+        if DF311_TYPE_DRIVE_URL:
+            gdown.download(DF311_TYPE_DRIVE_URL, str(TYPE_DATA_PATH), quiet=False)
+        elif DF311_TYPE_DRIVE_FILE_ID:
+            gdown.download(
+                f"https://drive.google.com/uc?id={DF311_TYPE_DRIVE_FILE_ID}",
+                str(TYPE_DATA_PATH),
+                quiet=False,
+            )
+
+    if not TYPE_DATA_PATH.exists():
+        raise FileNotFoundError(f"Missing data file: {TYPE_DATA_PATH}")
+
+    df = pd.read_csv(TYPE_DATA_PATH)
+
+    required_cols = [
+        "community_area",
+        "community_area_name",
+        "service_request_type",
+        "income_estimate",
+        "avg_response_time",
+        "total_requests",
+        "requests_per_1000_by_type",
+        "total_population",
+    ]
+    missing = [c for c in required_cols if c not in df.columns]
+    if missing:
+        raise ValueError(f"Missing required columns in df_311_type.csv: {missing}")
+
+    for col in [
+        "community_area",
+        "income_estimate",
+        "avg_response_time",
+        "total_requests",
+        "requests_per_1000_by_type",
+        "total_population",
+    ]:
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    df = df.dropna(
+        subset=["community_area", "community_area_name", "service_request_type", "income_estimate", "avg_response_time"]
+    ).copy()
+    df = df[(df["income_estimate"] > 0) & (df["avg_response_time"] >= 0)].copy()
+
+    # Exclude non-comparable information-only request type.
+    df = df[~df["service_request_type"].astype(str).str.upper().eq("311 INFORMATION ONLY CALL")].copy()
+
+    # Exclude OHARE from analysis.
+    df = df[~df["community_area_name"].astype(str).str.upper().eq("OHARE")].copy()
+
+    df["community_area"] = df["community_area"].astype(int)
+    df["avg_response_days"] = df["avg_response_time"] / 24.0
+
+    labels = ["Low income", "Lower-middle income", "Upper-middle income", "High income"]
+    df["income_group"] = pd.qcut(df["income_estimate"], q=4, labels=labels)
+    return df
+
+
+@st.cache_data
+def load_boundaries() -> gpd.GeoDataFrame:
+    if not GEO_PATH.exists():
+        raise FileNotFoundError(f"Missing boundary file: {GEO_PATH}")
+
+    gdf = gpd.read_file(GEO_PATH)
+    if gdf.crs is None:
+        gdf = gdf.set_crs(epsg=4326)
+    else:
+        gdf = gdf.to_crs(epsg=4326)
+
+    if "area_num_1" in gdf.columns:
+        gdf["community_area"] = pd.to_numeric(gdf["area_num_1"], errors="coerce")
+    elif "area_numbe" in gdf.columns:
+        gdf["community_area"] = pd.to_numeric(gdf["area_numbe"], errors="coerce")
+    else:
+        raise ValueError("Boundary file missing area number field (area_num_1 or area_numbe).")
+
+    gdf = gdf.dropna(subset=["community_area"]).copy()
+    gdf["community_area"] = gdf["community_area"].astype(int)
+
+    return gdf
+
+
+def build_scatter(filtered: pd.DataFrame) -> alt.Chart:
+    color_scale = alt.Scale(
+        domain=["Low income", "Lower-middle income", "Upper-middle income", "High income"],
+        range=["#4C92C3", "#4CAF50", "#F28E2B", "#E15759"],
+    )
+
+    y_min = float(filtered["avg_response_days"].min())
+    y_max = float(filtered["avg_response_days"].max())
+    y_pad = max((y_max - y_min) * 0.10, 0.25)
+    y_domain = [max(0.0, y_min - y_pad), y_max + y_pad]
+
+    points = (
+        alt.Chart(filtered)
+        .mark_circle(size=90, opacity=0.8, stroke="white", strokeWidth=0.7)
+        .encode(
+            x=alt.X("income_estimate:Q", title="Estimated Household Income (USD)"),
+            y=alt.Y(
+                "avg_response_days:Q",
+                title="Average Response Time (days)",
+                scale=alt.Scale(domain=y_domain),
+                axis=alt.Axis(format=".2f"),
+            ),
+            color=alt.Color("income_group:N", title="Income Group", scale=color_scale),
+            tooltip=[
+                alt.Tooltip("community_area_name:N", title="Community Area"),
+                alt.Tooltip("service_request_type:N", title="Service Type"),
+                alt.Tooltip("income_estimate:Q", title="Income", format=",.0f"),
+                alt.Tooltip("avg_response_days:Q", title="Response Time (days)", format=",.2f"),
+                alt.Tooltip("total_requests:Q", title="Requests", format=",.0f"),
+            ],
+        )
+    )
+
+    trend_line = (
+        alt.Chart(filtered)
+        .transform_regression("income_estimate", "avg_response_days", method="linear")
+        .mark_line(color="#222222", size=2.5)
+        .encode(x="income_estimate:Q", y="avg_response_days:Q")
+    )
+
+    return (points + trend_line).properties(height=540)
+
+
+def build_map_figure(gdf_boundaries: gpd.GeoDataFrame, map_df: pd.DataFrame, metric_col: str, map_mode: str) -> pdk.Deck:
+    merged = gdf_boundaries.merge(
+        map_df[["community_area", "community_area_name", "top_service_request", "income_group_area", metric_col]],
+        on="community_area",
+        how="left",
+    ).copy()
+
+    # Build color scale for choropleth.
+    values = merged[metric_col].astype(float)
+    valid = values.dropna()
+    if len(valid) == 0:
+        merged["r"], merged["g"], merged["b"] = 220, 220, 220
+    else:
+        vmin, vmax = valid.min(), valid.max()
+        if vmax == vmin:
+            norm = np.zeros(len(merged))
+        else:
+            norm = ((values - vmin) / (vmax - vmin)).fillna(0.0).clip(0, 1)
+
+        cmap_name = "Blues" if metric_col == "total_requests_overall" else "Oranges"
+        cmap = cm.get_cmap(cmap_name)
+        colors = norm.apply(lambda x: cmap(float(x)))
+        merged["r"] = colors.apply(lambda c: int(c[0] * 255))
+        merged["g"] = colors.apply(lambda c: int(c[1] * 255))
+        merged["b"] = colors.apply(lambda c: int(c[2] * 255))
+
+    metric_label = "Request volume" if metric_col == "total_requests_overall" else "Avg response time (days)"
+    merged["metric_value"] = merged[metric_col].round(2)
+    merged["metric_label"] = metric_label
+    merged["top_service_request"] = merged["top_service_request"].fillna("N/A")
+    merged["income_group_area"] = merged["income_group_area"].fillna("N/A")
+
+    geojson_data = merged.__geo_interface__
+
+    layer = pdk.Layer(
+        "GeoJsonLayer",
+        data=geojson_data,
+        pickable=True,
+        stroked=True,
+        filled=True,
+        extruded=False,
+        wireframe=False,
+        get_fill_color="[properties.r, properties.g, properties.b, 190]",
+        get_line_color=[80, 80, 80, 200],
+        line_width_min_pixels=1,
+    )
+
+    view_state = pdk.ViewState(latitude=41.8781, longitude=-87.6298, zoom=9.35, pitch=0)
+
+    return pdk.Deck(
+        layers=[layer],
+        initial_view_state=view_state,
+        map_style="light",
+        tooltip={
+            "html": "<b>{community_area_name}</b><br/>Income group: {income_group_area}<br/>Top service: {top_service_request}<br/>{metric_label}: {metric_value}",
+            "style": {"backgroundColor": "#1f2937", "color": "white", "fontSize": "12px"},
+        },
+    )
+
+
+def main() -> None:
+    st.set_page_config(page_title="Chicago 311 Dashboard", layout="wide")
+    st.title("Mapping 311 Requests and Response Times in Chicago Dashboard (2023-2024)")
+
+    df = load_data()
+    gdf_boundaries = load_boundaries()
+
+    # Scatter filters (only for scatter)
+    slope_df = (
+        df.groupby("service_request_type")
+        .apply(
+            lambda g: pd.Series(
+                {
+                    "slope": fit_slope(g),
+                    "requests": g["total_requests"].sum(),
+                    "median_days": g["avg_response_days"].median(),
+                }
+            )
+        )
+        .reset_index()
+    )
+
+    slope_df = slope_df.dropna(subset=["slope", "median_days"]).copy()
+    slope_df = slope_df[slope_df["median_days"] >= MIN_MEDIAN_DAYS].copy()
+
+    trend_option = st.radio("Trend filter (scatter only)", ["Negative trend", "Positive trend"], horizontal=True)
+
+    if trend_option == "Negative trend":
+        trend_df = slope_df[slope_df["slope"] < 0].copy()
+    else:
+        trend_df = slope_df[slope_df["slope"] > 0].copy()
+
+    trend_df["trend_strength"] = trend_df["slope"].abs()
+    trend_df = trend_df.sort_values(["trend_strength", "requests"], ascending=[False, False])
+    scatter_services = trend_df["service_request_type"].tolist()
+
+    if not scatter_services:
+        st.warning("No service request types match this trend filter.")
+        st.stop()
+
+    selected_service = st.selectbox("Service request type (scatter only)", scatter_services)
+    scatter_df = df[df["service_request_type"] == selected_service].copy()
+
+    st.subheader("Income vs Response Time")
+    st.altair_chart(build_scatter(scatter_df), use_container_width=True)
+
+    st.subheader("Chicago Community Area Map")
+    map_mode = st.radio(
+        "Map metric",
+        ["Service demand intensity (request volume)", "Service supply efficiency (response time)"],
+        horizontal=True,
+    )
+
+    map_agg = (
+        df.groupby(["community_area", "community_area_name"], as_index=False)
+        .agg(total_requests_overall=("total_requests", "sum"))
+    )
+
+    # Top 1 service request per community area (by request volume).
+    top_service = (
+        df.groupby(["community_area", "service_request_type"], as_index=False)["total_requests"]
+        .sum()
+        .sort_values(["community_area", "total_requests"], ascending=[True, False])
+        .drop_duplicates(subset=["community_area"])
+        .rename(columns={"service_request_type": "top_service_request"})[["community_area", "top_service_request"]]
+    )
+
+    map_agg = map_agg.merge(top_service, on="community_area", how="left")
+
+    # Income group classification per community area.
+    area_income_group = (
+        df.groupby("community_area", as_index=False)
+        .agg(income_group_area=("income_group", "first"))
+    )
+    area_income_group["income_group_area"] = area_income_group["income_group_area"].astype(str)
+    map_agg = map_agg.merge(area_income_group, on="community_area", how="left")
+
+    # Response-time map excludes FOREST GLEN only for the efficiency metric.
+    tmp = df[~df["community_area_name"].astype(str).str.upper().eq("FOREST GLEN")].copy()
+    tmp["weighted_days"] = tmp["avg_response_days"] * tmp["total_requests"]
+    weighted = (
+        tmp.groupby("community_area", as_index=False)
+        .agg(weighted_days_sum=("weighted_days", "sum"), total_requests=("total_requests", "sum"))
+    )
+    weighted["avg_response_days_overall"] = weighted["weighted_days_sum"] / weighted["total_requests"].where(weighted["total_requests"] > 0)
+
+    map_agg = map_agg.merge(weighted[["community_area", "avg_response_days_overall"]], on="community_area", how="left")
+
+    metric_col = "total_requests_overall" if map_mode == "Service demand intensity (request volume)" else "avg_response_days_overall"
+
+    map_deck = build_map_figure(gdf_boundaries, map_agg, metric_col, map_mode)
+    st.pydeck_chart(map_deck, use_container_width=True, height=430)
+
+    st.caption("Excluded: OHARE and 311 INFORMATION ONLY CALL")
+    st.caption("Response-time map additionally excludes: FOREST GLEN, is excluded only from the response-time map because it is dominated by a few unusually slow service categories, creating an outlier that compresses the color scale for other community areas.")
+    st.caption("Map reading: darker areas indicate higher values; lighter areas indicate lower values.")
+    st.caption("Map source: Boundaries_-_Community_Areas_20260301.geojson")
+
+
+if __name__ == "__main__":
+    main()
+```
+
+<!-- HIDDEN_SCRIPT_MIRROR_END -->
