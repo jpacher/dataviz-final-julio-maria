@@ -40,11 +40,29 @@ Source: City of Chicago Data Portal
   - Service demand (requests per 1,000 residents)
   - Service efficiency (response time in days)
 
-The filtered 311 service request dataset downloaded from the Chicago Data Portal exceeds GitHub’s 100MB file limit, so it is stored externally in Google Drive and can be accessed here: https://drive.google.com/file/d/1rYJpNKT4kix_NAPhL--LJIDq9Ctp1vhs/view
+The filtered 311 Service Requests dataset used in this project exceeds 100MB file size limit and is therefore not included in the repository.
 
-The dataset is publicly available at: https://data.cityofchicago.org/Service-Requests/311-Service-Requests/v6vf-nfxy/about_data
+When running the preprocessing script, the dataset will be automatically downloaded from Google Drive if it is not already present in the repository.
 
-### Large-file Reproducibility Note
+The file will be downloaded to:
+
+```bash
+data/raw-data/311_request.csv
+```
+
+The filtered (and used) dataset is hosted here, a public Google drive:
+
+https://drive.google.com/file/d/1rYJpNKT4kix_NAPhL--LJIDq9Ctp1vhs/view
+
+No manual renaming or modification of the file is required for the code to run.
+
+The original (unfiltered) dataset is publicly available from the City of Chicago Data Portal:
+
+https://data.cityofchicago.org/Service-Requests/311-Service-Requests/v6vf-nfxy/about_data
+
+The repository’s .gitignore file is configured to ignore large raw datasets.
+
+### 1.1 Large-file Reproducibility Note
 
 - `data/raw-data/311_request.csv` is intentionally not tracked in GitHub due to file size limits.
 - `df_311_type.csv` can also be sourced from Google Drive when absent locally.
@@ -84,7 +102,8 @@ Source: U.S. Census Bureau
   - Requests per 1,000 residents  
 
 - Merged 311 data with ACS median household income  
-- Grouped Community Areas into **income quartiles (Low → High income)**
+- Grouped Community Areas into **income quartiles (Low to High income)**
+- Merged with Community Areas boundaries for the map in the dashboard
 ---
 
 ## Repository Structure
@@ -101,15 +120,18 @@ streamlit-dashboard/
 │   ├── raw-data/
 │   │   └── community_areas.csv      # Community area metadata
 │   └── derived-data/
-│       ├── acs_filtered.csv
-│       ├── df_311_ca.csv
-│       ├── df_311_type.csv
+│       ├── acs_filtered.csv         # Filtered community area metadata
+│       ├── df_311_ca.csv            # Filtered 311 data 
+│       ├── df_311_type.csv          # Filtered 311 data by type of service request
 │       ├── Boundaries_-_Community_Areas_20260301.geojson
 │       └── plots/
 │           ├── box_requests_income.png
 │           ├── heatmap_income_services.png
 │           ├── box_requests_income.html
 │           └── heatmap_income_services.html
+├── Final_Writeup.pdf
+├── Final_Writeup.qmd
 ├── README.md
+├── Service request and delivery evidence from 311 Request in Chicago.pdf #final slides generated in canva
 └── requirements.txt
 ```
