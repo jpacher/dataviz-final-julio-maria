@@ -31,7 +31,7 @@ Secondary research questions:
 2. Do the types of 311 requests vary by neighborhood income level?
 3. Is service response time associated with neighborhood income?
 
-## Data and Methods
+## Data and Approach
 
 ### Data Sources
 
