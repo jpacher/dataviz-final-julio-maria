@@ -1,5 +1,5 @@
 ---
-title: "SERVICE REQUEST AND DELIVERY: EVIDENCE FROM 311 SYSTEM IN CHICAGO"
+title: "Service Request and Delivery: Evidence from 311 System in Chicago"
 subtitle: "PPHA 30538 Data Analytics and Visualization for Public Policy Final Project"
 author:
   - "María Manjarrez - GitHub username: Marite21 - Section 1 Professor Shi (M/W 9:00-10:20 AM)"
@@ -17,11 +17,11 @@ execute:
   message: false
 ---
 
-## Research Question
+## Context and Motivation
 
 Chicago exhibits substantial variation in median household income across neighborhoods. Public service delivery, such as street maintenance and pothole repairs, may also vary across space, raising concerns about whether municipal services are distributed equitably. The City of Chicago's 311 system provides a centralized platform through which residents submit service requests. These data offer a unique opportunity to evaluate how the city responds to neighborhood needs.
 
-Our principal research question is:
+## Research Question
 
 Are neighborhood income differences in Chicago associated with disparities in 311 service demand and response times across Community Areas?
 
@@ -31,23 +31,19 @@ Secondary research questions:
 2. Do the types of 311 requests vary by neighborhood income level?
 3. Is service response time associated with neighborhood income?
 
-## Approach
+## Data and Methods
 
 ### Data Sources
 
-We utilized datasets from the Chicago Data Portal, including:
-
-1. **311 Service Requests**: This dataset includes service requests created after the launch of the new 311 system on 12/18/2018 and some records from the previous system. Source: City of Chicago Data Portal (CHI311).
-2. **American Community Survey (ACS) 5-Year Data by Community Area**: This dataset provides neighborhood-level socioeconomic indicators from the 2019-2023 ACS 5-Year Estimates. Source: U.S. Census Bureau – ACS 5-Year Data (Community Area level).
-3. **Community Area Geoboundaries**: Chicago Community Area boundaries from the Chicago Data Portal, used for map-based analysis and dashboard geography.
+1. **311 Service Requests**: This dataset includes service requests created after the launch of the new 311 system on 12/18/2018 and some records from the previous system. **Source:** City of Chicago Data Portal (CHI311).
+2. **American Community Survey (ACS) 5-Year Data by Community Area**: This dataset provides neighborhood-level socioeconomic indicators (by Community Area level) from the 2019-2023 ACS 5-Year Estimates. **Source:** U.S. Census Bureau.
+3. **Chicago Community Area Geoboundaries**: This dataset was used for map-based analysis and dashboard geography. **Source:** City of Chicago Data Portal.
 
 **Data Retrieval:** Saturday, February 14, 4:17 PM.
 
 ### Data Preparation
 
-The raw 311 dataset includes records submitted between January 1, 2023 and December 31, 2024. We filtered observations to keep valid Community Area identifiers and relevant fields (creation date, completion date, request type, service status, and geography).
-
-To measure service efficiency, we constructed response time as completion date minus creation date. Observations with missing completion dates were excluded from response-time calculations.
+The downloaded 311 dataset includes records submitted between **January 1, 2023 and December 31, 2024**. We filtered observations to keep valid Community Area identifiers and relevant fields (creation date, completion date, request type, service status, and geography information). To measure service efficiency, we constructed response time as completion date minus creation date. Observations with missing completion dates were excluded from response-time calculations.
 
 The 311 data were aggregated at the Community Area level to produce:
 
@@ -56,11 +52,11 @@ The 311 data were aggregated at the Community Area level to produce:
 
 We normalized demand by neighborhood population using ACS, calculating requests per 1,000 residents, and merged the 311 aggregates with ACS socioeconomic indicators.
 
-Exclusions and reasons in analysis/dashboard:
+Exclusions and reasons in analysis and dashboard:
 
-- **OHARE**: excluded because it is not directly comparable to residential community areas.
-- **311 INFORMATION ONLY CALL**: excluded because it is not an actionable service-delivery category.
-- **FOREST GLEN**: excluded from response-time mapping because it behaves as an outlier that compresses map variation for other areas.
+- **COMMUNITY AREA OHARE**: excluded because it is not directly comparable to residential community areas.
+- **COMMUNITY AREA FOREST GLEN**: excluded from response-time mapping because it behaves as an outlier that compresses map variation for other areas.
+- **SERVICE REQUEST "311 INFORMATION ONLY CALL"**: excluded because it is not an actionable service-delivery category.
 
 ```{python}
 #| include: false
@@ -84,20 +80,30 @@ if not (code_dir / "app.py").exists():
 if not geo_path.exists():
     raise FileNotFoundError("Missing geoboundaries GeoJSON file")
 
-# Use existing derived outputs for render reproducibility without redownloading raw data.
-if not (derived_dir / "df_311_type.csv").exists():
-    raise FileNotFoundError("Missing data/derived-data/df_311_type.csv")
-if not (derived_dir / "df_311_ca.csv").exists():
-    raise FileNotFoundError("Missing data/derived-data/df_311_ca.csv")
+def run_script(script_name: str) -> None:
+    result = subprocess.run(
+        [sys.executable, str(code_dir / script_name)],
+        check=False,
+        cwd=project_root,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed running code/{script_name}\n\n"
+            f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}"
+        )
 
-# Rebuild static plots quietly from the project script.
-subprocess.run(
-    [sys.executable, str(code_dir / "plots_static.py")],
-    check=True,
-    cwd=project_root,
-    capture_output=True,
-    text=True,
-)
+# Always rebuild derived data first so knit handles merge/reshape end-to-end.
+run_script("preprocessing.py")
+
+if not (derived_dir / "df_311_type.csv").exists():
+    raise FileNotFoundError("Missing generated data/derived-data/df_311_type.csv")
+if not (derived_dir / "df_311_ca.csv").exists():
+    raise FileNotFoundError("Missing generated data/derived-data/df_311_ca.csv")
+
+# Rebuild static plots from the newly generated derived outputs.
+run_script("plots_static.py")
 
 # Load plotting functions directly from plots_static.py
 spec = importlib.util.spec_from_file_location("plots_static_module", code_dir / "plots_static.py")
@@ -140,17 +146,15 @@ from IPython.display import Image, display
 display(Image(filename=str(heatmap_png)))
 ```
 
-This second finding responds to Research Questions 2 and 3. The heatmap shows that demand patterns vary by service category and are not uniform across income groups. Different concentration patterns across cells support the interpretation that neighborhood context matters for both what residents request and how service outcomes differ across issue types.
+This second finding responds to Research Questions 2. The heatmap shows that demand patterns vary by service category and are not uniform across income groups. Different concentration patterns across cells support the interpretation that neighborhood context matters for what residents request.
 
-## Streamlit Dashboard (Brief Explanation)
+## Streamlit Dashboard
 
-Interactive app: [https://app-dashboard-qmg6hcjcl7n7vv6yqnpsag.streamlit.app/](https://app-dashboard-qmg6hcjcl7n7vv6yqnpsag.streamlit.app/)
+Interactive app: [Link to dashboard](https://app-dashboard-qmg6hcjcl7n7vv6yqnpsag.streamlit.app/)
 
-This first graphic shows the relationship between neighborhood income and 311 service outcomes across Community Areas.
+The first graphic answers the Research Questions 3 and shows the relationship between neighborhood income and 311 service response time across Community Areas by type of service. 
 
-We observe both positive and negative trends depending on the service type selected, suggesting that disparities are not uniform across categories.
-
-For some service types, higher-income areas show shorter response times, indicating a potential efficiency advantage. In other cases, the contrary occurs.
+We observe both positive and negative trends depending on the service type selected, suggesting that disparities are not uniform across categories. For some service types, higher-income areas show shorter response times, indicating a potential efficiency advantage. In other cases, the contrary occurs.
 
 The interactive feature allows users to select specific service types, enabling direct comparison across Community Areas and revealing how patterns shift depending on the issue analyzed.
 
@@ -159,13 +163,9 @@ The dashboard also includes two maps:
 1. Requests - volume.
 2. Service time - average (different from the graphic because here it is an average of all service types).
 
-We used Chicago boundaries from Chicago Data Portal.
-
 ## Policy Implications
 
-Chicago should monitor requests per 1,000 residents and average response times by Community Area and income group, rather than relying only on citywide averages. Prioritizing resources where high demand and slower service overlap can improve equity in service delivery.
-
-
+These findings suggest that 311 data can serve as a practical management tool for improving municipal service delivery. By tracking delays, identifying recurring issues, and monitoring service backlogs in real time, the City can redesign workflows, implement preventive maintenance strategies, and make faster operational adjustments. In addition, incorporating 311 performance metrics into budgeting decisions can help align municipal spending with demonstrated service needs and measurable outcomes, strengthening overall efficiency and accountability.
 
 
 <!-- HIDDEN_SCRIPT_MIRROR_START -->

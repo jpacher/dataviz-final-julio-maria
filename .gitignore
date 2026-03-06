@@ -1,1 +1,8 @@
+# Large dataset (downloaded automatically with gdown)
 data/raw-data/311_request.csv
+
+# Mac system files
+.DS_Store
+
+# Python cache
+__pycache__/
